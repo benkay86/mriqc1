@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use futures::stream::{StreamExt, TryStreamExt};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use mriqc1::cancellable_process::CancelSignal;
-use mriqc1::mriqc::{Mriqc1Options, Mriqc1Process};
+use mriqc1::mriqc::{MriqcError, Mriqc1Options, Mriqc1Process};
 use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -125,30 +125,36 @@ async fn main() -> Result<()> {
             let main_pb = main_pb.clone();
             let interrupted = interrupted.clone();
             let mriqc_options = mriqc_options.clone();
-            // Spawn mriqc for this participant and wait asynchronously for it
-            // to finish.
+            // Spawn mriqc for this participant and update progress bar.
             async move {
-                let options = Mriqc1Options {
-                    bids_dir: &mriqc_options.bids_dir,
-                    out_dir: &mriqc_options.out_dir,
-                    mriqc: Some(&mriqc_options.mriqc),
-                    work_dir: mriqc_options.work_dir.as_deref(),
-                    extra_args: mriqc_options.extra_args.iter().map(|s| s as &OsStr).collect(),
-                    participant: &participant
-                };
-                // Closure to interrupt the mriqc process.
-                let cancel = || match interrupted.load(Ordering::Relaxed) {
-                    true => Some(CancelSignal::Interrupt),
-                    false => None
-                };
-                // Spawn the mriqc process.
-                let process = Mriqc1Process::new_with_cancel(options, cancel).await?;
-                // Wait for it to either finish or be cancelled.
-                let res = process.wait().await;
+                // Await result of mriqc.
+                let res = async move {
+                    let options = Mriqc1Options {
+                        bids_dir: &mriqc_options.bids_dir,
+                        out_dir: &mriqc_options.out_dir,
+                        mriqc: Some(&mriqc_options.mriqc),
+                        work_dir: mriqc_options.work_dir.as_deref(),
+                        extra_args: mriqc_options.extra_args.iter().map(|s| s as &OsStr).collect(),
+                        participant: &participant
+                    };
+                    // Closure to interrupt the mriqc process.
+                    let cancel = || match interrupted.load(Ordering::Relaxed) {
+                        true => Some(CancelSignal::Interrupt),
+                        false => None
+                    };
+                    // Spawn the mriqc process.
+                    let process = Mriqc1Process::new_with_cancel(options, cancel).await?;
+                    // Wait for it to either finish or be cancelled.
+                    process.wait().await?;
+                    // Make return type of Result<(), MriqcError> explicit.
+                    Ok::<(), MriqcError>(())
+                }.await;
+                // Update progress bar before propagating errors.
                 // Finish this participant's progress bar.
                 participant_pb.finish_and_clear();
                 // Increment main progress bar.
                 main_pb.inc(1);
+                // Now we can propagate any errors.
                 res.and(Ok(()))
             }
         })
