@@ -87,7 +87,7 @@ impl ShadowBids {
         let dst: PathBuf = match &parent {
             Some(parent) => {
                 // Verify that dst does not already have a parent.
-                if !dst.is_relative() || dst.parent().is_some() {
+                if !dst.is_relative() || !dst.parent().unwrap_or(Path::new("")).as_os_str().is_empty() {
                     return Err(BidsError::HasParent{path: dst});
                 }
                 // Place dst inside parent.
