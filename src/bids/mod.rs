@@ -42,6 +42,13 @@ pub enum BidsError {
         bids_src: PathBuf,
         participant: String
     },
+    /// Couldn't canonicalize the path to the BIDS tree, or else the BIDS tree
+    /// is the filesystem root (which should not happen).
+    #[error("Couldn't canonicalize path to BIDS tree: {}", bids_src.to_string_lossy())]
+    Canonicalize {
+        bids_src: PathBuf,
+        source: Option<std::io::Error>,
+    },
     /// There was an error performing a filesystem operation.
     #[error(transparent)]
     FileSystem(#[from] FileSystemError),
@@ -134,7 +141,19 @@ impl ShadowBids {
     /// The root of the shadow bids tree will be located at `parent/src`.
     pub async fn new_with_parent<P1: Into<PathBuf>>(src: P1, parent: Arc<TempDir>) -> Result<Self, BidsError> {
         let src = src.into();
-        let dst = src.clone();
+        let dst: PathBuf = match src.canonicalize() {
+            Ok(path) => match path.file_name() {
+                Some(name) => Ok(name.to_os_string()),
+                None => Err(BidsError::Canonicalize {
+                    bids_src: src.clone(),
+                    source: None
+                })
+            },
+            Err(source) => Err(BidsError::Canonicalize {
+                bids_src: src.clone(),
+                source: Some(source)
+            })
+        }?.into();
         Self::new(src, dst, Some(parent)).await
     }
 

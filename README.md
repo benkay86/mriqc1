@@ -27,10 +27,10 @@ rustup update stable
 
 ### Using Git
 
-This application uses [git](https://git-scm.com) for version management.  Your linux distribution most likely provides pre-build packages for git.  To download this project and its submodules for the first time:
+This application uses [git](https://git-scm.com) for version management.  Your Linux distribution most likely provides pre-built packages for git.  To download this project and its submodules for the first time:
 
 ```
-git clone https://github.com/benkay86/dcmextract
+git clone https://github.com/benkay86/mriqc1
 cd dcmextract
 git submodule update --init --recursive
 ```

@@ -32,7 +32,10 @@ async fn main() -> Result<()> {
         bids_dir: cmd_opts.bids_dir,
         out_dir: cmd_opts.out_dir,
         mriqc: cmd_opts.mriqc,
-        work_dir: cmd_opts.work_dir,
+        work_dir: match cmd_opts.work_dir {
+            Some(work_dir) => Some(work_dir.into()),
+            None => Some(std::env::temp_dir())
+        },
         extra_args: cmd_opts.extra_args
     });
 
