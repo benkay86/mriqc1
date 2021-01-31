@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use futures::stream::{StreamExt, TryStreamExt};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use mriqc1::cancellable_process::CancelSignal;
-use mriqc1::mriqc::{MriqcError, Mriqc1Options, Mriqc1Process};
+use mriqc1::mriqc::{Mriqc1Options, Mriqc1Process};
 use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -10,8 +10,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::io::AsyncWriteExt;
 
 mod cmd;
-mod indicatif_progress_stream;
-use indicatif_progress_stream::ProgressStream;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -75,6 +73,9 @@ async fn main() -> Result<()> {
     };
     // Add this indicator to the multibar.
     let main_pb = Arc::new(multibar.clone().add(main_pb));
+    // Tick the bar once now so it will render above the participants' spinner
+    // bars.
+    main_pb.tick();
     // Animate progress bars on a separate thread.
     let multibar_animation = {
         // Create a clone of the multibar, which we will move into the task.
@@ -103,8 +104,7 @@ async fn main() -> Result<()> {
 
     // Iterate over stream of participants provded on the command line.
     futures::stream::iter(participants)
-        // Update main progress bar.
-        .progress_with(main_pb)
+
         // Cancel the stream if we get interrupted.
         .take_while(|_| {
             let interrupted = interrupted.clone();
@@ -122,6 +122,7 @@ async fn main() -> Result<()> {
             participant_pb.enable_steady_tick(2000); // spin every 2 seconds
             let participant_pb = multibar.clone().add(participant_pb);
             // Clone references we need to move into async block.
+            let main_pb = main_pb.clone();
             let interrupted = interrupted.clone();
             let mriqc_options = mriqc_options.clone();
             // Spawn mriqc for this participant and wait asynchronously for it
@@ -143,14 +144,14 @@ async fn main() -> Result<()> {
                 // Spawn the mriqc process.
                 let process = Mriqc1Process::new_with_cancel(options, cancel).await?;
                 // Wait for it to either finish or be cancelled.
-                process.wait().await?;
+                let res = process.wait().await;
                 // Finish this participant's progress bar.
                 participant_pb.finish_and_clear();
-                Ok::<(), MriqcError>(())
+                // Increment main progress bar.
+                main_pb.inc(1);
+                res.and(Ok(()))
             }
         })
-        // Map errors to anyhow::Error.
-        .err_into::<anyhow::Error>()
         // Emit warnings and filter them out of the stream.
         .filter(|result| match cmd_opts_werror {
             // Don't convert warnings to errors.  Pass them through as errors.
