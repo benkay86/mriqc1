@@ -75,6 +75,16 @@ async fn main() -> Result<()> {
     };
     // Add this indicator to the multibar.
     let main_pb = Arc::new(multibar.clone().add(main_pb));
+    // Animate progress bars on a separate thread.
+    let multibar_animation = {
+        // Create a clone of the multibar, which we will move into the task.
+        let multibar = multibar.clone();
+
+        // multibar.join() is *not* async and will block until all the progress
+        // bars are done, therefore we must spawn it on a separate scheduler
+        // on which blocking behavior is allowed.
+        tokio::task::spawn_blocking(move || { multibar.join() })
+    };
 
     // Install signal handler.  Set atomic flag to true if we are interrupted.
     let interrupted = Arc::new(AtomicBool::new(false));
@@ -162,19 +172,10 @@ async fn main() -> Result<()> {
         .try_for_each_concurrent(cmd_opts_n_par, |_| std::future::ready(Ok(())))
         .await?;
 
-    // Animate progress bars on a separate thread.
-    let multibar = {
-        // Create a clone of the multibar, which we will move into the task.
-        let multibar = multibar.clone();
-
-        // multibar.join() is *not* async and will block until all the progress
-        // bars are done, therefore we must spawn it on a separate scheduler
-        // on which blocking behavior is allowed.
-        tokio::task::spawn_blocking(move || { multibar.join() })
-    };
+    // Wait for progress bar to join.
     // First ? for outer join of tokio::task
     // Second ? for MultiProgress::join()
-    multibar.await??;
+    multibar_animation.await??;
 
     // Detect if we were interrupted.
     if interrupted.load(Ordering::Acquire) {
