@@ -118,9 +118,9 @@ async fn main() -> Result<()> {
                 ProgressStyle::default_spinner()
 	            .template("Running mriqc on participant {msg} {spinner}")
             );
+            let participant_pb = multibar.clone().add(participant_pb);
             participant_pb.set_message(&participant);
             participant_pb.enable_steady_tick(2000); // spin every 2 seconds
-            let participant_pb = multibar.clone().add(participant_pb);
             // Clone references we need to move into async block.
             let main_pb = main_pb.clone();
             let interrupted = interrupted.clone();
@@ -155,7 +155,7 @@ async fn main() -> Result<()> {
                 // Increment main progress bar.
                 main_pb.inc(1);
                 // Now we can propagate any errors.
-                res.and(Ok(()))
+                res
             }
         })
         // Emit warnings and filter them out of the stream.
@@ -167,7 +167,11 @@ async fn main() -> Result<()> {
             // Emit warnings and return false to filter them out.
             false => match result {
                 Err(warning) => {
-                    eprintln!("Warning: {}", warning);
+                    if !cmd_opts_quiet {
+                        // Need extra \n so warning will not be overwritten with
+                        //  progress bar.
+                        eprintln!("Warning: {}\n", warning);
+                    }
                     futures::future::ready(false)
                 },
                 // Pass through successful results.
@@ -182,6 +186,7 @@ async fn main() -> Result<()> {
     // Wait for progress bar to join.
     // First ? for outer join of tokio::task
     // Second ? for MultiProgress::join()
+    main_pb.finish_at_current_pos();
     multibar_animation.await??;
 
     // Detect if we were interrupted.
