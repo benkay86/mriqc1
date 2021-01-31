@@ -1,0 +1,16 @@
+[package]
+name = "mriqc1"
+description = "Run mriqc one participant at a time, in parallel."
+version = "0.1.0"
+authors = ["Benjamin Kay <benjamin@benkay.net>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "^1.0.37"
+futures = "~0.3.0"
+indicatif = "^0.15"
+libc = "0.2.84"
+structopt = { version = "^0.3.21", features = ["wrap_help"] }
+tempfile = "^3.2"
+thiserror = "^1.0.23"
+tokio = { version = "~1.0.1", features = ['fs', 'io-std', 'io-util', 'macros', 'process', 'rt-multi-thread', 'signal', 'sync'] }

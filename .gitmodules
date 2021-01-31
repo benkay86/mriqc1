@@ -1,0 +1,6 @@
+[submodule "src/cmd/error/gist"]
+	path = src/cmd/error/gist
+	url = https://gist.github.com/benkay86/6f4fbe31c219fb0a99bba13735c52206
+[submodule "src/indicatif_progress_stream/gist"]
+	path = src/indicatif_progress_stream/gist
+	url = https://gist.github.com/benkay86/6afffd4cf90ad84ac43e42d59d197e08
