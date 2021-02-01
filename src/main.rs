@@ -10,6 +10,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::io::AsyncWriteExt;
 
 mod cmd;
+mod indicatif_progress_stream;
+use indicatif_progress_stream::ProgressStream;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -133,7 +135,7 @@ async fn main() -> Result<()> {
                 participant_pb.enable_steady_tick(2000); // spin every 2 seconds
             }
             // Clone references we need to move into async block.
-            let main_pb = main_pb.clone();
+            //let main_pb = main_pb.clone();
             let interrupted = interrupted.clone();
             let mriqc_options = mriqc_options.clone();
             // Spawn mriqc for this participant and update progress bar.
@@ -164,13 +166,15 @@ async fn main() -> Result<()> {
                 // Finish this participant's progress bar.
                 participant_pb.finish_and_clear();
                 // Increment main progress bar.
-                main_pb.inc(1);
+                //main_pb.inc(1);
                 // Now we can propagate any errors.
                 res
             }
         })
         // Run N participants' mriqc processes in parallel.
         .buffer_unordered(cmd_opts_n_par)
+        // Update the main progress bar.
+        .progress_with(main_pb.clone())
         // Emit warnings and filter them out of the stream.
         .filter(|result| {
             // Clone borrowed Err (if any) into a warning mesage, which we can
