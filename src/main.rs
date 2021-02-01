@@ -49,7 +49,10 @@ async fn main() -> Result<()> {
 
     // Set up a multi-progress bar.
     // The bar is stored in an `Arc` to facilitate sharing between threads.
-    let multibar = std::sync::Arc::new(MultiProgress::with_draw_target(ProgressDrawTarget::stdout()));
+    let multibar = match cmd_opts_quiet {
+        true => std::sync::Arc::new(MultiProgress::with_draw_target(ProgressDrawTarget::hidden())),
+        false => std::sync::Arc::new(MultiProgress::with_draw_target(ProgressDrawTarget::stdout_with_hz(1))) // redraw progress bar at most once per second
+    };
     // Create an overall progress indicator.
     let main_pb = match cmd_opts_quiet {
         // Sshhh... hide the progress bar if user asked us to be quite!
@@ -77,14 +80,17 @@ async fn main() -> Result<()> {
     // bars.
     main_pb.tick();
     // Animate progress bars on a separate thread.
-    let multibar_animation = {
-        // Create a clone of the multibar, which we will move into the task.
-        let multibar = multibar.clone();
+    let multibar_animation = match cmd_opts_quiet {
+        true => None,
+        false => {
+            // Create a clone of the multibar, which we will move into the task.
+            let multibar = multibar.clone();
 
-        // multibar.join() is *not* async and will block until all the progress
-        // bars are done, therefore we must spawn it on a separate scheduler
-        // on which blocking behavior is allowed.
-        tokio::task::spawn_blocking(move || { multibar.join() })
+            // multibar.join() is *not* async and will block until all the progress
+            // bars are done, therefore we must spawn it on a separate scheduler
+            // on which blocking behavior is allowed.
+            Some(tokio::task::spawn_blocking(move || { multibar.join() }))
+        },
     };
 
     // Install signal handler.  Set atomic flag to true if we are interrupted.
@@ -112,15 +118,20 @@ async fn main() -> Result<()> {
         // Perform the actual mriqc processing.
         .map(|participant| {
             // Set up a progress bar for this participant.
-            let participant_pb = ProgressBar::new_spinner()
-            .with_style( // set style on progress bar
-                ProgressStyle::default_spinner()
-	            .template("Running mriqc on participant {msg} {spinner}")
-                    .tick_strings(&["", ".", "..", "...", ""])
-            );
+            let participant_pb = match cmd_opts_quiet {
+                true => ProgressBar::hidden(),
+                false => ProgressBar::new_spinner()
+                .with_style( // set style on progress bar
+                    ProgressStyle::default_spinner()
+    	            .template("Running mriqc on participant {msg} {spinner}")
+                        .tick_strings(&["", ".", "..", "...", ""])
+                )
+            };
             let participant_pb = multibar.clone().add(participant_pb);
-            participant_pb.set_message(&participant);
-            participant_pb.enable_steady_tick(1500); // spin every second
+            if !cmd_opts_quiet {
+                participant_pb.set_message(&participant);
+                participant_pb.enable_steady_tick(2000); // spin every 2 seconds
+            }
             // Clone references we need to move into async block.
             let main_pb = main_pb.clone();
             let interrupted = interrupted.clone();
@@ -161,24 +172,35 @@ async fn main() -> Result<()> {
         // Run N participants' mriqc processes in parallel.
         .buffer_unordered(cmd_opts_n_par)
         // Emit warnings and filter them out of the stream.
-        .filter(|result| match cmd_opts_werror {
-            // Don't convert warnings to errors.  Pass them through as errors.
-            // This will cause the stream to stop after encountering the first
-            // error.
-            true => futures::future::ready(true),
-            // Emit warnings and return false to filter them out.
-            false => match result {
-                Err(warning) => {
-                    if !cmd_opts_quiet {
-                        // Need extra \n so warning will not be overwritten with
-                        // progress bar.
-                        eprintln!("Warning: {}\n", warning);
-                    }
-                    futures::future::ready(false)
+        .filter(|result| {
+            // Clone borrowed Err (if any) into a warning mesage, which we can
+            // then move into an async block.
+            let warning = match result {
+                Ok(_) => None,
+                Err(warning) => Some(format!("Warning: {}\n", warning))
+            };
+            // Should we warn on errors or propagate an error on error?
+            async move { match cmd_opts_werror {
+                // Don't convert warnings to errors.  Return true to pass them
+                // through as errors.  This will cause the stream to stop after
+                // encountering the first error.
+                true => true ,
+                false => match warning {
+                    // Filter out warnings by returning false.
+                    Some(warning) => match cmd_opts_quiet {
+                        true => false, // be quiet, no mesage on terminal
+                        false => { // emit warning message
+                            let mut stderr = tokio::io::stderr();
+                            // Ignore any issues writing message to stderr.
+                            let _ = stderr.write_all(warning.as_bytes()).await;
+                            false
+                        }
+                    },
+                    // There was no warning/error, pass through Ok result by
+                    // returning true.
+                    None => true
                 },
-                // Pass through successful results.
-                Ok(_) => futures::future::ready(true)
-            }
+            }}
         })
         // Await to poll stream to completion.  Cancel stream early on any
         // unfiltered errors that have propagated to this point.
@@ -189,7 +211,9 @@ async fn main() -> Result<()> {
     // First ? for outer join of tokio::task
     // Second ? for MultiProgress::join()
     main_pb.finish_at_current_pos();
-    multibar_animation.await??;
+    if let Some(multibar_animation) = multibar_animation {
+        multibar_animation.await??;
+    }
 
     // Detect if we were interrupted.
     if interrupted.load(Ordering::Acquire) {
