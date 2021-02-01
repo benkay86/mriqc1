@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use futures::stream::{StreamExt, TryStreamExt};
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressDrawTarget, ProgressBar, ProgressStyle};
 use mriqc1::cancellable_process::CancelSignal;
 use mriqc1::mriqc::{MriqcError, Mriqc1Options, Mriqc1Process};
 use std::ffi::{OsStr, OsString};
@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
 
     // Set up a multi-progress bar.
     // The bar is stored in an `Arc` to facilitate sharing between threads.
-    let multibar = std::sync::Arc::new(MultiProgress::new());
+    let multibar = std::sync::Arc::new(MultiProgress::with_draw_target(ProgressDrawTarget::stdout()));
     // Create an overall progress indicator.
     let main_pb = match cmd_opts_quiet {
         // Sshhh... hide the progress bar if user asked us to be quite!
@@ -102,11 +102,8 @@ async fn main() -> Result<()> {
         });
     }
 
-eprintln!("\nn: {}\n", cmd_opts_n_par);
-
     // Iterate over stream of participants provded on the command line.
     futures::stream::iter(participants)
-
         // Cancel the stream if we get interrupted.
         .take_while(|_| {
             let interrupted = interrupted.clone();
@@ -174,7 +171,7 @@ eprintln!("\nn: {}\n", cmd_opts_n_par);
                 Err(warning) => {
                     if !cmd_opts_quiet {
                         // Need extra \n so warning will not be overwritten with
-                        //  progress bar.
+                        // progress bar.
                         eprintln!("Warning: {}\n", warning);
                     }
                     futures::future::ready(false)
