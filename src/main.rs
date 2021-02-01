@@ -117,10 +117,11 @@ async fn main() -> Result<()> {
             .with_style( // set style on progress bar
                 ProgressStyle::default_spinner()
 	            .template("Running mriqc on participant {msg} {spinner}")
+                    .tick_strings(&["", ".", "..", "...", ""])
             );
             let participant_pb = multibar.clone().add(participant_pb);
             participant_pb.set_message(&participant);
-            participant_pb.enable_steady_tick(2000); // spin every 2 seconds
+            participant_pb.enable_steady_tick(1500); // spin every second
             // Clone references we need to move into async block.
             let main_pb = main_pb.clone();
             let interrupted = interrupted.clone();
@@ -183,7 +184,7 @@ async fn main() -> Result<()> {
         .try_for_each_concurrent(cmd_opts_n_par, |_| std::future::ready(Ok(())))
         .await?;
 
-    // Wait for progress bar to join.
+    // Wait for progress bar animation to finish.
     // First ? for outer join of tokio::task
     // Second ? for MultiProgress::join()
     main_pb.finish_at_current_pos();
