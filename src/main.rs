@@ -102,6 +102,8 @@ async fn main() -> Result<()> {
         });
     }
 
+eprintln!("\nn: {}\n", cmd_opts_n_par);
+
     // Iterate over stream of participants provded on the command line.
     futures::stream::iter(participants)
 
@@ -111,7 +113,7 @@ async fn main() -> Result<()> {
             async move { !interrupted.load(Ordering::Relaxed) }
         })
         // Perform the actual mriqc processing.
-        .then(|participant| {
+        .map(|participant| {
             // Set up a progress bar for this participant.
             let participant_pb = ProgressBar::new_spinner()
             .with_style( // set style on progress bar
@@ -159,6 +161,8 @@ async fn main() -> Result<()> {
                 res
             }
         })
+        // Run N participants' mriqc processes in parallel.
+        .buffer_unordered(cmd_opts_n_par)
         // Emit warnings and filter them out of the stream.
         .filter(|result| match cmd_opts_werror {
             // Don't convert warnings to errors.  Pass them through as errors.
@@ -179,9 +183,9 @@ async fn main() -> Result<()> {
                 Ok(_) => futures::future::ready(true)
             }
         })
-        // Process up to N files concurrently.  Cancel stream early on any
+        // Await to poll stream to completion.  Cancel stream early on any
         // unfiltered errors that have propagated to this point.
-        .try_for_each_concurrent(cmd_opts_n_par, |_| std::future::ready(Ok(())))
+        .try_for_each(|_| async { Ok(()) } )
         .await?;
 
     // Wait for progress bar animation to finish.
