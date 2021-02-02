@@ -31,7 +31,7 @@ This application uses [git](https://git-scm.com) for version management.  Your L
 
 ```
 git clone https://github.com/benkay86/mriqc1
-cd dcmextract
+cd mriqc1
 git submodule update --init --recursive
 ```
 
@@ -57,7 +57,9 @@ Or you can manually invoke the binary at `target/release/mriqc1`.
 
 ### Background
 
-[mriqc](https://mriqc.org) is a tool for generating quality-control metrics on MRI data.  It uses [nipype](https://nipy.org/packages/nipype/index.html) under-the-hood to process data from multiple MRI study participants (i.e. subjects)  in parallel.  Sometimes when processing a very large number of subjects mriqc will exhaust system resources and crash.  mriqc1 is a harness for mriqc which processes just one subject at a time, but can be configured to run multile instances of mriqc in parallel.  By specifying the the number of parallel mriqc instances you gain finer control over system resource usage.
+[mriqc](https://mriqc.org) is a tool for generating quality-control metrics on MRI data.  It uses [nipype](https://nipy.org/packages/nipype/index.html) under-the-hood to process data from multiple MRI study participants (i.e. subjects)  in parallel.  Sometimes when processing a very large number of subjects mriqc will exhaust system resources and crash.  (The `--nprocs` option does not appear to limit RAM usage.)
+
+mriqc1 is a harness for mriqc which processes just one subject at a time, but can be configured to run multile instances of mriqc in parallel.  By specifying the the number of parallel mriqc instances you gain finer control over system resource usage.
 
 ### Running mriqc
 
@@ -80,6 +82,40 @@ mriqc1 --bids-dir /bids --out-dir /out --participant-label bob susan -- -m T1w
 The `--bids-dir` and `--out-dir` options are required to explicitly specify the BIDS and output directories, respectively.  Otherwise the arguments are very similar to mriqc.  You can pass through any extra arguments not supported by mriqc1 to mriqc by placing them after the `--`.  In this case, mriqc1 does not understand the `-m T1w` argument so we pass it through to mriqc.
 
 Run `mriqc --help` to see a full list of supported arguments.  The `-n` option controls how many instances of mriqc to run in parallel and defaults to `-n 1`.
+
+### Advanced Usage
+
+Combine mriqc1 with features of the [bash shell](https://en.wikipedia.org/wiki/Bash_%28Unix_shell%29) to achieve more complex processing objectives.  In the following example we process T1-weighted data with `-m T1w` for 20 participants at a time with `-n 20` from a list of participants in a newline-delimited file with `$(tr ...)`.  We manually specify the temporary/working directory with `--work-dir`, pipe warnings to a log file for later inspection with `2>log.txt`, and opt-out of mriqc's telemetry with `--no-sub`.
+
+```
+mriqc1 -n 20 --bids-dir /bids --out-dir /out --work-dir /tmp \
+--participant-label $(tr '\n' ' ' < participants.txt) -- \
+-m T1w --no-sub 2> log.txt
+```
+```
+Running mriqc, this could take a long time. press Ctrl+C to cancel...
+(474/706 participants): 22h [====================>              ] 10h
+Running mriqc on participant NDARINV11111111 ...
+Running mriqc on participant NDARINV22222222 ...
+Running mriqc on participant NDARINV33333333 ...
+Running mriqc on participant NDARINV44444444 ...
+Running mriqc on participant NDARINV55555555 ...
+Running mriqc on participant NDARINV66666666 ...
+Running mriqc on participant NDARINV77777777 .
+Running mriqc on participant NDARINV88888888 .
+Running mriqc on participant NDARINV99999999 .
+Running mriqc on participant NDARINV10101010 .
+Running mriqc on participant NDARINV01100110 ...
+Running mriqc on participant NDARINV12121212 .
+Running mriqc on participant NDARINV13131313 .
+Running mriqc on participant NDARINV14141414 ...
+Running mriqc on participant NDARINV15151515 
+Running mriqc on participant NDARINV16161616 ..
+Running mriqc on participant NDARINV17171717 ..
+Running mriqc on participant NDARINV18181818 ..
+Running mriqc on participant NDARINV19191919 .
+Running mriqc on participant NDARINV20202020 
+```
 
 ## License
 
