@@ -174,7 +174,6 @@ async fn main() -> Result<()> {
                         Ok::<(), MriqcError>(())
                     }.await
                 };
-                std::thread::sleep(std::time::Duration::from_millis(5000));
                 // Update progress bar before propagating errors.
                 // Finish this participant's progress bar.
                 participant_pb.finish_and_clear();
