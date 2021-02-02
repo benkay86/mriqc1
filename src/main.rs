@@ -19,6 +19,7 @@ async fn main() -> Result<()> {
     let cmd_opts = cmd::Opts::from_args()?;
     let cmd_opts_quiet = cmd_opts.quiet;
     let cmd_opts_n_par = cmd_opts.n_par;
+    let cmd_opts_resume = cmd_opts.resume;
     let cmd_opts_werror = cmd_opts.werror;
     let participants = cmd_opts.participant_labels;
     struct MriqcOptions { // pptions passed to each instance of mriqc
@@ -140,33 +141,44 @@ async fn main() -> Result<()> {
             let mriqc_options = mriqc_options.clone();
             // Spawn mriqc for this participant and update progress bar.
             async move {
-                // Await result of mriqc.
-                let res = async move {
-                    let options = Mriqc1Options {
-                        bids_dir: &mriqc_options.bids_dir,
-                        out_dir: &mriqc_options.out_dir,
-                        mriqc: Some(&mriqc_options.mriqc),
-                        work_dir: mriqc_options.work_dir.as_deref(),
-                        extra_args: mriqc_options.extra_args.iter().map(|s| s as &OsStr).collect(),
-                        participant: &participant
-                    };
-                    // Closure to interrupt the mriqc process.
-                    let cancel = || match interrupted.load(Ordering::Relaxed) {
-                        true => Some(CancelSignal::Interrupt),
-                        false => None
-                    };
-                    // Spawn the mriqc process.
-                    let process = Mriqc1Process::new_with_cancel(options, cancel).await?;
-                    // Wait for it to either finish or be cancelled.
-                    process.wait().await?;
-                    // Make return type of Result<(), MriqcError> explicit.
-                    Ok::<(), MriqcError>(())
-                }.await;
+                // Does this subject already exist in output directory?
+                let mut skip = false;
+                if cmd_opts_resume { // Only need to check if --resume on command line.
+                    if tokio::fs::metadata(mriqc_options.out_dir.join(format!("sub-{}", participant))).await.is_ok() {
+                        // Skip subject if --resume on command line and subject
+                        // already exists in output directory.
+                        skip = true;
+                    }
+                }
+                let res = match skip {
+                    // Skip running mriqc.
+                    true => Ok(()),
+                    // Await result of mriqc.
+                    false => async move {
+                        let options = Mriqc1Options {
+                            bids_dir: &mriqc_options.bids_dir,
+                            out_dir: &mriqc_options.out_dir,
+                            mriqc: Some(&mriqc_options.mriqc),
+                            work_dir: mriqc_options.work_dir.as_deref(),
+                            extra_args: mriqc_options.extra_args.iter().map(|s| s as &OsStr).collect(),
+                            participant: &participant
+                        };
+                        // Closure to interrupt the mriqc process.
+                        let cancel = || match interrupted.load(Ordering::Relaxed) {
+                            true => Some(CancelSignal::Interrupt),
+                            false => None
+                        };
+                        // Spawn the mriqc process.
+                        let process = Mriqc1Process::new_with_cancel(options, cancel).await?;
+                        // Wait for it to either finish or be cancelled.
+                        process.wait().await?;
+                        // Make return type of Result<(), MriqcError> explicit.
+                        Ok::<(), MriqcError>(())
+                    }.await
+                };
                 // Update progress bar before propagating errors.
                 // Finish this participant's progress bar.
                 participant_pb.finish_and_clear();
-                // Increment main progress bar.
-                //main_pb.inc(1);
                 // Now we can propagate any errors.
                 res
             }

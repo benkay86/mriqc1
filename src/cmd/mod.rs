@@ -30,6 +30,11 @@ pub struct Opts {
     #[structopt(short = "w", long = "work-dir", parse(from_os_str))]
     pub work_dir: Option<PathBuf>,
 
+    /// Skip participants for whom any data is already present in the output
+    /// directory.
+    #[structopt(long)]
+    pub resume: bool,
+
     /// Location of mriqc binary.
     #[structopt(long = "mriqc", default_value = "mriqc", env = "MRIQC", parse(from_os_str))]
     pub mriqc: PathBuf,

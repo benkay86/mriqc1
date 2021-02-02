@@ -85,36 +85,19 @@ Run `mriqc --help` to see a full list of supported arguments.  The `-n` option c
 
 ### Advanced Usage
 
-Combine mriqc1 with features of the [bash shell](https://en.wikipedia.org/wiki/Bash_%28Unix_shell%29) to achieve more complex processing objectives.  In the following example we process T1-weighted data with `-m T1w` for 20 participants at a time with `-n 20` from a list of participants in a newline-delimited file with `$(tr ...)`.  We manually specify the temporary/working directory with `--work-dir`, pipe warnings to a log file for later inspection with `2>log.txt`, and opt-out of mriqc's telemetry with `--no-sub`.
+Combine mriqc1 with features of the [bash shell](https://en.wikipedia.org/wiki/Bash_%28Unix_shell%29) to achieve more complex processing objectives.  In the following example we process T1-weighted data with `-m T1w` for 3 participants at a time with `-n 3` from a list of participants in a newline-delimited file with `$(tr ...)`.  We manually specify the temporary/working directory with `--work-dir`, pipe warnings to a log file for later inspection with `2>log.txt`, and opt-out of mriqc's telemetry with `--no-sub`.  The `--resume` option skips re-processing subjects who already exist in the output directory.
 
 ```
-mriqc1 -n 20 --bids-dir /bids --out-dir /out --work-dir /tmp \
---participant-label $(tr '\n' ' ' < participants.txt) -- \
--m T1w --no-sub 2> log.txt
+mriqc1 --bids-dir /bids --out-dir /out --work-dir /tmp \
+--participant-label $(tr '\n' ' ' < participants.txt) \
+-n 3 --resume -- -m T1w --no-sub 2> log.txt
 ```
 ```
 Running mriqc, this could take a long time. press Ctrl+C to cancel...
-(474/706 participants): 22h [====================>              ] 10h
-Running mriqc on participant NDARINV11111111 ...
-Running mriqc on participant NDARINV22222222 ...
+(25/100 participants): 5h [====================>                ] 15h
+Running mriqc on participant NDARINV11111111 .
+Running mriqc on participant NDARINV22222222 ..
 Running mriqc on participant NDARINV33333333 ...
-Running mriqc on participant NDARINV44444444 ...
-Running mriqc on participant NDARINV55555555 ...
-Running mriqc on participant NDARINV66666666 ...
-Running mriqc on participant NDARINV77777777 .
-Running mriqc on participant NDARINV88888888 .
-Running mriqc on participant NDARINV99999999 .
-Running mriqc on participant NDARINV10101010 .
-Running mriqc on participant NDARINV01100110 ...
-Running mriqc on participant NDARINV12121212 .
-Running mriqc on participant NDARINV13131313 .
-Running mriqc on participant NDARINV14141414 ...
-Running mriqc on participant NDARINV15151515 
-Running mriqc on participant NDARINV16161616 ..
-Running mriqc on participant NDARINV17171717 ..
-Running mriqc on participant NDARINV18181818 ..
-Running mriqc on participant NDARINV19191919 .
-Running mriqc on participant NDARINV20202020 
 ```
 
 ## License
