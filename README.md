@@ -59,7 +59,7 @@ Or you can manually invoke the binary at `target/release/mriqc1`.
 
 [mriqc](https://mriqc.org) is a tool for generating quality-control metrics on MRI data.  It uses [nipype](https://nipy.org/packages/nipype/index.html) under-the-hood to process data from multiple MRI study participants (i.e. subjects)  in parallel.  Sometimes when processing a very large number of subjects mriqc will exhaust system resources and crash.  (The `--nprocs` option does not appear to limit RAM usage.)
 
-mriqc1 is a harness for mriqc which processes just one subject at a time, but can be configured to run multile instances of mriqc in parallel.  By specifying the the number of parallel mriqc instances you gain finer control over system resource usage.
+mriqc1 is a harness for mriqc which processes just one subject at a time, but can be configured to run multiple instances of mriqc in parallel.  By specifying the the number of parallel mriqc instances you gain finer control over system resource usage.
 
 ### Running mriqc
 
@@ -98,6 +98,33 @@ Running mriqc, this could take a long time. press Ctrl+C to cancel...
 Running mriqc on participant NDARINV11111111 .
 Running mriqc on participant NDARINV22222222 ..
 Running mriqc on participant NDARINV33333333 ...
+```
+
+### Help
+
+Here is the output of `mriqc --help` for reference.  Feel free to contact the main author [Benjamin Kay](mailto:benjamin@benkay.net) for assistance.
+
+```
+USAGE:
+    mriqc1 [FLAGS] [OPTIONS] --bids-dir <bids-dir> --out-dir <out-dir> --participant-label <participant-labels>... [--] [extra-args]...
+
+FLAGS:
+    -h, --help       Prints help information
+    -q, --quiet      Be quite, don't show progress bar or warnings
+        --resume     Skip participants for whom any data is already present in the output directory
+    -V, --version    Prints version information
+        --werror     Convert warnings about failure to process a participant to errors and exit on the first error
+
+OPTIONS:
+        --bids-dir <bids-dir>                          BIDS directory containing data
+        --mriqc <mriqc>                                Location of mriqc binary [env: MRIQC=]  [default: mriqc]
+        --out-dir <out-dir>                            Directory for output files
+    -n <parallel>                                      Number of participants to run in parallel [default: 1]
+        --participant-label <participant-labels>...    Participant label(s)
+    -w, --work-dir <work-dir>                          Working directory for temporary files, defaults to system tempdir
+
+ARGS:
+    <extra-args>...    Extra arguments to pass through to mriqc
 ```
 
 ## License
