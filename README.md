@@ -85,12 +85,12 @@ Run `mriqc --help` to see a full list of supported arguments.  The `-n` option c
 
 ### Advanced Usage
 
-Combine mriqc1 with features of the [bash shell](https://en.wikipedia.org/wiki/Bash_%28Unix_shell%29) to achieve more complex processing objectives.  In the following example we process T1-weighted data with `-m T1w` for 3 participants at a time with `-n 3` from a list of participants in a newline-delimited file with `$(tr ...)`.  We manually specify the temporary/working directory with `--work-dir`, pipe warnings to a log file for later inspection with `2>log.txt`, and opt-out of mriqc's telemetry with `--no-sub`.  The `--resume` option skips re-processing subjects who already exist in the output directory.
+Combine mriqc1 with features of the [bash shell](https://en.wikipedia.org/wiki/Bash_%28Unix_shell%29) to achieve more complex processing objectives.  In the following example we process T1-weighted data with `-m T1w` for 3 participants at a time with `-n 3` from a list of participants in a newline-delimited file with `$(tr ...)`.  We manually specify the temporary/working directory with `--work-dir`, pipe warnings to a log file for later inspection with `2>log.txt`, and opt-out of mriqc's telemetry with `--no-sub`.
 
 ```
-mriqc1 --bids-dir /bids --out-dir /out --work-dir /tmp \
---participant-label $(tr '\n' ' ' < participants.txt) \
--n 3 --resume -- -m T1w --no-sub 2> log.txt
+mriqc1 -n 3 --bids-dir /bids --out-dir /out --work-dir /tmp \
+--participant-label $(tr '\n' ' ' < participants.txt) -- \
+-m T1w --no-sub 2> log.txt
 ```
 ```
 Running mriqc, this could take a long time. press Ctrl+C to cancel...
@@ -113,10 +113,11 @@ FLAGS:
     -q, --quiet      Be quite, don't show progress bar or warnings
         --resume     Skip participants for whom any data is already present in the output directory
     -V, --version    Prints version information
-        --werror     Convert warnings about failure to process a participant to errors and exit on the first error
+        --werror     Convert warnings about failure to process a participant to errors and exit on the first error.  This does not apply to timeout warnings
 
 OPTIONS:
         --bids-dir <bids-dir>                          BIDS directory containing data
+        --timeout <minutes>                            Cancel a participant's mriqc process if it runs longer than this many minutes
         --mriqc <mriqc>                                Location of mriqc binary [env: MRIQC=]  [default: mriqc]
         --out-dir <out-dir>                            Directory for output files
     -n <parallel>                                      Number of participants to run in parallel [default: 1]

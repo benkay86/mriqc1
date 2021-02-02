@@ -35,6 +35,11 @@ pub struct Opts {
     #[structopt(long)]
     pub resume: bool,
 
+    /// Cancel a participant's mriqc process if it runs longer than this many
+    /// minutes
+    #[structopt(long, name = "minutes", parse(try_from_str = parse_minutes))]
+    pub timeout: Option<std::time::Duration>,
+
     /// Location of mriqc binary.
     #[structopt(long = "mriqc", default_value = "mriqc", env = "MRIQC", parse(from_os_str))]
     pub mriqc: PathBuf,
@@ -44,12 +49,17 @@ pub struct Opts {
     pub quiet: bool,
 
     /// Convert warnings about failure to process a participant to errors and
-    /// exit on the first error.
+    /// exit on the first error.  This does not apply to timeout warnings.
     #[structopt(long)]
     pub werror: bool,
 
     /// Extra arguments to pass through to mriqc.
     pub extra_args: Vec<OsString>,
+}
+
+// Helper function to parse a string into a Duration as minutes.
+fn parse_minutes(minutes: &str) -> Result<std::time::Duration, std::num::ParseIntError> {
+    Ok(std::time::Duration::from_secs(minutes.parse::<u64>()? * 60))
 }
 
 // Custom type for command line parsing errors.

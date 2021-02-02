@@ -20,6 +20,7 @@ async fn main() -> Result<()> {
     let cmd_opts_quiet = cmd_opts.quiet;
     let cmd_opts_n_par = cmd_opts.n_par;
     let cmd_opts_resume = cmd_opts.resume;
+    let cmd_opts_timeout = cmd_opts.timeout;
     let cmd_opts_werror = cmd_opts.werror;
     let participants = cmd_opts.participant_labels;
     struct MriqcOptions { // pptions passed to each instance of mriqc
@@ -164,10 +165,7 @@ async fn main() -> Result<()> {
                             participant: &participant
                         };
                         // Closure to interrupt the mriqc process.
-                        let cancel = || match interrupted.load(Ordering::Relaxed) {
-                            true => Some(CancelSignal::Interrupt),
-                            false => None
-                        };
+                        let cancel = cancel_on_interrupt_or_timeout(interrupted, cmd_opts_timeout, cmd_opts_quiet, participant.clone());
                         // Spawn the mriqc process.
                         let process = Mriqc1Process::new_with_cancel(options, cancel).await?;
                         // Wait for it to either finish or be cancelled.
@@ -176,6 +174,7 @@ async fn main() -> Result<()> {
                         Ok::<(), MriqcError>(())
                     }.await
                 };
+                std::thread::sleep(std::time::Duration::from_millis(5000));
                 // Update progress bar before propagating errors.
                 // Finish this participant's progress bar.
                 participant_pb.finish_and_clear();
@@ -242,4 +241,32 @@ async fn main() -> Result<()> {
         stderr.write_all(b"...all done.\n").await?;
     }
     Ok(())
+}
+
+// Convenience function returns a closure that returns a cancel signal when
+// `interrupted` is true or after `timeout` (if any) has elapsed.
+fn cancel_on_interrupt_or_timeout(interrupted: Arc<AtomicBool>, timeout: Option<std::time::Duration>, quiet: bool, participant: String) -> impl FnMut()->Option<CancelSignal> {
+    let start_time = std::time::Instant::now();
+    move || {
+        // Have we been running for longer than the timeout?
+        let timed_out = match timeout {
+            // Maybe
+            Some(timeout) => {
+                let elapsed = std::time::Instant::now() - start_time;
+                let timed_out = elapsed > timeout;
+                if timed_out && !quiet {
+                    // Emit warning
+                    eprintln!("Participant {} timed out after {:?}.", participant, elapsed);
+                }
+                timed_out
+            },
+            // Timeout not set, so no
+            None => false
+        };
+        // Cancel if timed out or interrupted.
+        match timed_out || interrupted.load(Ordering::Relaxed) {
+            true => Some(CancelSignal::Interrupt),
+            false => None
+        }
+    }
 }
