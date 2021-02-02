@@ -63,10 +63,10 @@ async fn main() -> Result<()> {
         true => ProgressBar::hidden(),
         // Default, visible progress bar.
         false => {
-            // Lead with message on stderr.
+            // Lead with message on stdout.
             {
-                let mut stderr = tokio::io::stderr();
-                stderr.write_all(b"Running mriqc, this could take a long time. press Ctrl+C to cancel...\n").await?;
+                let mut stdout = tokio::io::stdout();
+                stdout.write_all(b"Running mriqc, this could take a long time. Press Ctrl+C to cancel.\n").await?;
             }
             // Configure progress bar.
             let pb = ProgressBar::new(participants.len() as u64)
@@ -238,7 +238,7 @@ async fn main() -> Result<()> {
     // All done!
     if !cmd_opts_quiet {
         let mut stderr = tokio::io::stderr();
-        stderr.write_all(b"...all done.\n").await?;
+        stderr.write_all(b"mriqc1 finished.\n").await?;
     }
     Ok(())
 }
