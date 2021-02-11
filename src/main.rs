@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use futures::stream::{StreamExt, TryStreamExt};
+use futures_util::stream::{StreamExt, TryStreamExt};
 use indicatif::{MultiProgress, ProgressDrawTarget, ProgressBar, ProgressStyle};
 use mriqc1::cancellable_process::CancelSignal;
 use mriqc1::mriqc::{MriqcError, Mriqc1Options, Mriqc1Process};
@@ -113,7 +113,7 @@ async fn main() -> Result<()> {
     }
 
     // Iterate over stream of participants provded on the command line.
-    futures::stream::iter(participants)
+    futures_util::stream::iter(participants)
         // Cancel the stream if we get interrupted.
         .take_while(|_| {
             let interrupted = interrupted.clone();
